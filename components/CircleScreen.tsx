@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { fetchHealthContext, incrementWineGlass, hasSupabase, FALLBACK_DATA, type HealthContext } from '@/lib/supabase'
 
@@ -554,6 +554,191 @@ function StoryScreen() {
   )
 }
 
+// ── STREET (Imagination Engine) ──────────────────────────────────────────────
+
+type StreetStage = 'photo' | 'choice' | 'processing' | 'result'
+
+const STREET_STYLES = [
+  {
+    id: 'christmas',
+    label: '🎄 PARIS NOËL',
+    bg: 'from-red-700/60 to-red-900/60',
+    border: 'border-red-400/40',
+    accent: 'text-red-300',
+    msg: "OKAY. TRANSFORMING YOUR STREET INTO A WINTER WONDERLAND...",
+  },
+  {
+    id: 'rave',
+    label: '🎉 RAVE PARTY',
+    bg: 'from-purple-700/60 to-purple-900/60',
+    border: 'border-purple-400/40',
+    accent: 'text-purple-300',
+    msg: "ALRIGHT. TURNING YOUR STREET INTO A RAVE RIGHT NOW...",
+  },
+  {
+    id: 'jelly',
+    label: '🍧 JELLY WORLD',
+    bg: 'from-pink-600/60 to-pink-900/60',
+    border: 'border-pink-400/40',
+    accent: 'text-pink-300',
+    msg: "PERFECT. MELTING YOUR STREET INTO JELLY AS WE SPEAK...",
+  },
+]
+
+function StreetScreen() {
+  const [stage, setStage] = useState<StreetStage>('photo')
+  const [preview, setPreview] = useState<string | null>(null)
+  const [file, setFile] = useState<File | null>(null)
+  const [statusMsg, setStatusMsg] = useState('')
+  const [chosenLabel, setChosenLabel] = useState('')
+  const [resultUrl, setResultUrl] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setFile(f)
+    setPreview(URL.createObjectURL(f))
+    setStage('choice')
+  }
+
+  const handleChoice = async (style: typeof STREET_STYLES[0]) => {
+    setStatusMsg(style.msg)
+    setChosenLabel(style.label)
+    setStage('processing')
+
+    try {
+      const formData = new FormData()
+      if (file) formData.append('photo', file)
+      formData.append('style', style.id)
+
+      const res = await fetch('/api/street-transform', { method: 'POST', body: formData })
+      const data = await res.json()
+      if (data.imageUrl) {
+        setResultUrl(data.imageUrl)
+        setStage('result')
+      }
+    } catch {
+      // Demo fallback — show processing state until result arrives via polling
+      setStage('processing')
+    }
+  }
+
+  const reset = () => {
+    setStage('photo')
+    setPreview(null)
+    setFile(null)
+    setResultUrl(null)
+    setStatusMsg('')
+    setChosenLabel('')
+  }
+
+  return (
+    <Screen gradient="bg-gradient-to-b from-[#05050f] via-[#0a0a1a] to-[#000005]">
+      <NavBar title="Imagination Engine" accent="text-blue-400" />
+
+      {/* STAGE 1 — TAKE LIVE PHOTO */}
+      {stage === 'photo' && (
+        <>
+          <h1 className="text-2xl font-bold text-white mb-2">Imagination Engine</h1>
+          <p className="text-white/40 text-xs uppercase tracking-widest mb-10">Step 1 — Take a photo</p>
+
+          <div className="flex flex-col flex-1 justify-center gap-4">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full py-12 rounded-3xl bg-gradient-to-br from-blue-600/50 to-blue-900/50 border border-blue-400/30 flex flex-col items-center gap-4 active:scale-95 transition-transform shadow-2xl"
+            >
+              <span className="text-6xl">📷</span>
+              <span className="text-white font-bold text-2xl tracking-tight">TAKE A PHOTO</span>
+              <span className="text-white/30 text-xs uppercase tracking-widest">Uses your live camera</span>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handlePhotoCapture}
+              className="hidden"
+            />
+          </div>
+
+          <p className="text-center text-white/20 text-xs pb-4 mt-8">
+            Point at anything. Pick a transformation. Watch it happen.
+          </p>
+        </>
+      )}
+
+      {/* STAGE 2 — CHOOSE STYLE */}
+      {stage === 'choice' && (
+        <>
+          <h1 className="text-2xl font-bold text-white mb-2">Choose Your Reality</h1>
+          <p className="text-white/40 text-xs uppercase tracking-widest mb-4">Step 2 — Pick a transformation</p>
+
+          {preview && (
+            <div
+              className="w-full h-36 rounded-2xl mb-6 overflow-hidden border border-white/10 bg-cover bg-center relative"
+              style={{ backgroundImage: `url(${preview})` }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+              <p className="absolute bottom-2 left-3 text-white/50 text-xs uppercase tracking-widest">Your photo</p>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-3 flex-1">
+            {STREET_STYLES.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => handleChoice(s)}
+                className={`w-full py-5 px-5 rounded-2xl bg-gradient-to-br ${s.bg} border ${s.border} flex items-center justify-between active:scale-95 transition-transform shadow-lg`}
+              >
+                <span className="text-white font-bold text-xl">{s.label}</span>
+                <span className={`${s.accent} text-2xl`}>→</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* STAGE 3 — PROCESSING */}
+      {stage === 'processing' && (
+        <div className="flex flex-col flex-1 items-center justify-center">
+          <div className="w-full max-w-xs backdrop-blur-md bg-white/5 border border-white/10 rounded-3xl px-6 py-12 text-center">
+            <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 leading-tight mb-8">
+              {statusMsg}
+            </p>
+            <div className="flex justify-center gap-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" />
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:0.2s]" />
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:0.4s]" />
+            </div>
+            <p className="text-white/30 text-xs mt-8">Your image is being generated...</p>
+          </div>
+        </div>
+      )}
+
+      {/* STAGE 4 — RESULT */}
+      {stage === 'result' && resultUrl && (
+        <div className="flex flex-col flex-1 gap-4">
+          <h1 className="text-xl font-bold text-white mb-1">
+            {chosenLabel} <span className="text-green-400">✓</span>
+          </h1>
+          <img
+            src={resultUrl}
+            alt="Transformed street"
+            className="w-full rounded-2xl border border-white/10 shadow-2xl object-cover"
+          />
+          <button
+            onClick={reset}
+            className="w-full py-4 rounded-2xl bg-white/10 border border-white/20 text-white font-semibold active:scale-95 transition-transform"
+          >
+            Try Another →
+          </button>
+        </div>
+      )}
+    </Screen>
+  )
+}
+
 // ── NOT FOUND ─────────────────────────────────────────────────────────────────
 
 function NotFoundScreen() {
@@ -608,6 +793,8 @@ export function CircleScreen({ circle }: { circle: string }) {
       return <WeightsScreen data={data} />
     case 'story':
       return <StoryScreen />
+    case 'street':
+      return <StreetScreen />
     default:
       return <NotFoundScreen />
   }

@@ -7,6 +7,7 @@ export function generateStaticParams() {
     { circle: 'wine' },
     { circle: 'weights' },
     { circle: 'story' },
+    { circle: 'street' },
   ]
 }
 
