@@ -302,7 +302,7 @@ function WineScreen({ data: initialData }: { data: HealthContext }) {
     if (typeof window !== 'undefined') {
       const stored = sessionStorage.getItem(WINE_SESSION_KEY)
       if (stored !== null) {
-        const count = parseInt(stored, 10)
+        const count = parseInt(stored, 10) || 0 // guard against NaN if storage corrupted
         return { ...initialData, glasses_wine_tonight: count }
       }
     }
