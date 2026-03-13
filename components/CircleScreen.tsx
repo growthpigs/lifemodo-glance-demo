@@ -113,10 +113,10 @@ function FobAScreen({ data }: { data: HealthContext }) {
 
       {/* Header */}
       <div className="mb-5">
-        <h1 className="text-3xl font-bold text-white leading-tight">
+        <h1 className="text-3xl font-bold text-white leading-tight" suppressHydrationWarning>
           Good {getGreeting()},<br />Roderic.
         </h1>
-        <p className="text-white/50 text-sm mt-1">{getDayLabel()} · Home · 3 people in</p>
+        <p className="text-white/50 text-sm mt-1" suppressHydrationWarning>{getDayLabel()} · Home · 3 people in</p>
       </div>
 
       {/* Health Pill */}
@@ -251,7 +251,7 @@ function FobBScreen({ data }: { data: HealthContext }) {
       <NavBar back="/c/fob-a" title="Home Status" accent="text-green-400" />
 
       <h1 className="text-2xl font-bold text-white mb-1">Your Home · Right Now</h1>
-      <p className="text-white/40 text-sm mb-6">{getDayLabel()} · {new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</p>
+      <p className="text-white/40 text-sm mb-6" suppressHydrationWarning>{getDayLabel()} · {new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</p>
 
       <div className="flex flex-col gap-3 flex-1">
         {statusCards.map((card) => {
@@ -294,27 +294,41 @@ function FobBScreen({ data }: { data: HealthContext }) {
 
 // ── WINE ─────────────────────────────────────────────────────────────────────
 
+const WINE_SESSION_KEY = 'lm_wine_tonight'
+
 function WineScreen({ data: initialData }: { data: HealthContext }) {
-  const [data, setData] = useState(initialData)
-  const [logged, setLogged] = useState(false)
+  // Persist wine count across navigation using sessionStorage
+  const [data, setData] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = sessionStorage.getItem(WINE_SESSION_KEY)
+      if (stored !== null) {
+        const count = parseInt(stored, 10)
+        return { ...initialData, glasses_wine_tonight: count }
+      }
+    }
+    return initialData
+  })
+  const [logged, setLogged] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem(WINE_SESSION_KEY) !== null
+    }
+    return false
+  })
   const [logging, setLogging] = useState(false)
 
   async function handleLog() {
+    if (logging || logged) return // guard against double-tap
     setLogging(true)
-    const ok = await incrementWineGlass(data)
-    if (ok) {
-      setData((d) => ({
-        ...d,
-        glasses_wine_tonight: (d.glasses_wine_tonight || 0) + 1,
-        glasses_wine_week: (d.glasses_wine_week || 0) + 1,
-      }))
-    } else {
-      // Optimistic update even without Supabase
-      setData((d) => ({
-        ...d,
-        glasses_wine_tonight: (d.glasses_wine_tonight || 0) + 1,
-        glasses_wine_week: (d.glasses_wine_week || 0) + 1,
-      }))
+    const newCount = (data.glasses_wine_tonight || 0) + 1
+    await incrementWineGlass(data) // best-effort Supabase write
+    setData((d) => ({
+      ...d,
+      glasses_wine_tonight: newCount,
+      glasses_wine_week: (d.glasses_wine_week || 0) + 1,
+    }))
+    // Persist so navigating away and back shows correct count
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(WINE_SESSION_KEY, String(newCount))
     }
     setLogged(true)
     setLogging(false)
@@ -363,7 +377,7 @@ function WineScreen({ data: initialData }: { data: HealthContext }) {
         ) : (
           <ActionButton
             onClick={handleLog}
-            accent="bg-rose-600"
+            accent={`bg-rose-600${logging ? ' opacity-60 pointer-events-none' : ''}`}
           >
             {logging ? 'Logging…' : '🍷 Log this glass'}
           </ActionButton>
