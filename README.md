@@ -1,36 +1,107 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LifeModo Glance — NFC Demo PWA
 
-## Getting Started
+> **Tier 1 of the LifeModo V6.0 Architecture** — The zero-friction NFC entry point to scnd-brain.
 
-First, run the development server:
+## What This Is
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+The Glance PWA is the physical-digital interface of the LifeModo system. NFC tags embedded in Arcus Circles trigger contextual iOS screens with no login, no app install, no friction. Tap a tag → see your data → act.
+
+**Saturday demo use case:** Investor presentation. Tap physical NFC fobs → see LifeModo working in the real world.
+
+## Live URLs
+
+| Screen | NFC URL |
+|--------|---------|
+| 🏠 Live App | https://lifemodo-glance-demo.vercel.app |
+| Fob Side A | https://lifemodo-glance-demo.vercel.app/c/fob-a |
+| Dashboard | https://lifemodo-glance-demo.vercel.app/c/fob-b |
+| Booze Nag | https://lifemodo-glance-demo.vercel.app/c/wine |
+| Weights | https://lifemodo-glance-demo.vercel.app/c/weights |
+| Story Circle | https://lifemodo-glance-demo.vercel.app/c/story |
+
+## Architecture Context (V6.0)
+
+```
+Interface Layer (Tier 1 — this repo)
+  └── Glance PWA — NFC/PWA, no auth, zero friction
+
+Compute Layer
+  └── CleverClaw (OpenClaw fork) — 6 specialized agents
+
+Memory Layer
+  └── scnd-brain — Supabase Postgres + pgvector per client
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The Glance screens project from scnd-brain's Life Item Taxonomy (8 types: Task, Fact, Preference, Method, Observation, Season, Open Loop, Project). Currently uses hardcoded fallback data for the demo.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Design
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**iOS 26 Liquid Glass** — dark navy gradient (`#0a0f2c` → `#05050f`), frosted glass cards (`backdrop-blur-md bg-white/10`), per-screen accent colors:
+- Fob-A: Blue (`#0d1b3e`)
+- Dashboard: Green (`#051b0d`)
+- Booze Nag: Crimson (`#2d0a12`)
+- Weights: Orange (`#1f0d00`)
+- Story: Purple (`#12002d`)
 
-## Learn More
+## Screens
 
-To learn more about Next.js, take a look at the following resources:
+| Route | Screen | Purpose |
+|-------|--------|---------|
+| `/c/fob-a` | Glance Home | Greeting + health pill + 4 action tiles |
+| `/c/fob-b` | Home Status | Full household + health dashboard |
+| `/c/wine` | Booze Nag | Drink logging with HRV correlation insight |
+| `/c/weights` | Home Gym | HRV-gated workout readiness |
+| `/c/story` | Storytelling Circle | Family archive playback |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Running Locally
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm install
+npm run dev
+# Open http://localhost:3000 → redirects to /c/fob-a
+```
 
-## Deploy on Vercel
+## Connecting Live Data (Supabase)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Create a free Supabase project at https://supabase.com
+2. Run this SQL:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```sql
+CREATE TABLE health_context (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  recorded_at TIMESTAMPTZ DEFAULT NOW(),
+  sleep_hours NUMERIC DEFAULT 7.2,
+  hrv_ms INTEGER DEFAULT 58,
+  readiness_pct INTEGER DEFAULT 89,
+  resting_hr INTEGER DEFAULT 62,
+  steps_today INTEGER DEFAULT 3240,
+  glasses_wine_tonight INTEGER DEFAULT 0,
+  glasses_wine_week INTEGER DEFAULT 2,
+  last_workout JSONB DEFAULT '{"reps": 15, "sets": 3, "peak_hr": 122, "calories": 45}'
+);
+```
+
+3. Copy your Project URL and anon key into `.env.local`:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
+
+4. Add one row to `health_context` with today's data
+5. Redeploy to Vercel (add env vars in Project Settings → Environment Variables)
+
+## Demo Notes
+
+- **No Supabase configured** = fallback data always shown (HRV 58ms, 89% ready, 7.2h sleep)
+- **iOS Safari NFC behavior**: NFC tap opens URL in Safari, not the installed PWA
+- **"Add to Home Screen"**: Works via PWA manifest + apple-touch-icon
+- **Voice/audio features**: Shown as "coming in v1" — not implemented in demo
+
+## Tech Stack
+
+- Next.js 16 (App Router)
+- React 19
+- Tailwind CSS v4
+- Supabase (optional — graceful fallback)
+- Deployed on Vercel

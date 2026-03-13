@@ -1,8 +1,31 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { fetchHealthContext, incrementWineGlass, FALLBACK_DATA, type HealthContext } from '@/lib/supabase'
+import { fetchHealthContext, incrementWineGlass, hasSupabase, FALLBACK_DATA, type HealthContext } from '@/lib/supabase'
+
+// ── Toast Notification ────────────────────────────────────────────────────────
+function Toast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onDismiss, 3000)
+    return () => clearTimeout(t)
+  }, [onDismiss])
+  return (
+    <div className="fixed bottom-8 left-4 right-4 z-50 transition-all duration-300">
+      <div className="backdrop-blur-md bg-white/15 border border-white/25 rounded-2xl px-5 py-4 text-white text-sm font-medium text-center shadow-2xl">
+        {message}
+      </div>
+    </div>
+  )
+}
+
+function useToast() {
+  const [toast, setToast] = useState<string | null>(null)
+  const show = useCallback((msg: string) => setToast(msg), [])
+  const dismiss = useCallback(() => setToast(null), [])
+  const ToastEl = toast ? <Toast message={toast} onDismiss={dismiss} /> : null
+  return { show, ToastEl }
+}
 
 function getGreeting() {
   const h = new Date().getHours()
@@ -83,6 +106,7 @@ function ActionButton({
 // ── FOB-A ─────────────────────────────────────────────────────────────────────
 
 function FobAScreen({ data }: { data: HealthContext }) {
+  const { show: showToast, ToastEl } = useToast()
   return (
     <Screen gradient="bg-gradient-to-b from-[#0d1b3e] via-[#0a0f2c] to-[#05050f]">
       <NavBar title="LifeModo · Glance" accent="text-blue-400" />
@@ -160,14 +184,14 @@ function FobAScreen({ data }: { data: HealthContext }) {
             )
           if (card.href && card.href.startsWith('tel:'))
             return (
-              <a key={card.label} href={card.href}>
+              <button key={card.label} onClick={() => showToast('📞 Coach — available at Saturday demo')} className="text-left">
                 {inner}
-              </a>
+              </button>
             )
           return (
             <button
               key={card.label}
-              onClick={() => alert('Voice capture coming')}
+              onClick={() => showToast('🎤 Voice capture — coming in v1')}
               className="text-left"
             >
               {inner}
@@ -181,6 +205,7 @@ function FobAScreen({ data }: { data: HealthContext }) {
           View dashboard →
         </Link>
       </div>
+      {ToastEl}
     </Screen>
   )
 }
@@ -188,7 +213,7 @@ function FobAScreen({ data }: { data: HealthContext }) {
 // ── FOB-B ─────────────────────────────────────────────────────────────────────
 
 function FobBScreen({ data }: { data: HealthContext }) {
-  const statusCards = [
+  const statusCards: Array<{ icon: string; label: string; value: string; color: string; href?: string }> = [
     {
       icon: '🏠',
       label: 'Household',
@@ -216,8 +241,7 @@ function FobBScreen({ data }: { data: HealthContext }) {
     {
       icon: '📞',
       label: 'Coach',
-      value: 'Available · Tap to call',
-      href: 'tel:+33600000000',
+      value: 'Available · Tap to connect',
       color: 'text-blue-300',
     },
   ]
@@ -312,12 +336,12 @@ function WineScreen({ data: initialData }: { data: HealthContext }) {
       {/* Glass Count */}
       <GlassCard className="mb-4 text-center bg-rose-500/10 border-rose-400/20">
         <div className="text-5xl font-bold text-white mb-1">
-          {(data.glasses_wine_tonight || 0) + (logged ? 0 : 1)}
+          {data.glasses_wine_tonight || 0}
         </div>
         <div className="text-rose-200 text-sm">
           {logged
-            ? `Logged! ${data.glasses_wine_tonight} tonight · ${data.glasses_wine_week} this week`
-            : `Glass ${(data.glasses_wine_tonight || 0) + 1} of this evening · ${data.glasses_wine_week} this week`}
+            ? `✓ Logged · ${data.glasses_wine_tonight} tonight · ${data.glasses_wine_week} this week`
+            : `Tonight · Tap to log glass #${(data.glasses_wine_tonight || 0) + 1} · ${data.glasses_wine_week} this week`}
         </div>
       </GlassCard>
 
@@ -438,6 +462,7 @@ function WeightsScreen({ data }: { data: HealthContext }) {
 function StoryScreen() {
   const [playing, setPlaying] = useState(false)
   const [recording, setRecording] = useState(false)
+  const { show: showToast, ToastEl } = useToast()
 
   return (
     <Screen gradient="bg-gradient-to-b from-[#12002d] via-[#0a0019] to-[#05050f]">
@@ -488,7 +513,7 @@ function StoryScreen() {
               setPlaying(false)
             } else {
               setPlaying(true)
-              alert('Audio coming · Story playback will be available in v1')
+              showToast('▶ Story playback — coming in v1')
             }
           }}
           accent="bg-purple-600"
@@ -498,7 +523,7 @@ function StoryScreen() {
         <ActionButton
           onClick={() => {
             setRecording(!recording)
-            if (!recording) alert('Recording coming · Voice capture will be available in v1')
+            if (!recording) showToast('🎙 Voice recording — coming in v1')
           }}
           accent="border-purple-400/50"
           outline
@@ -510,6 +535,7 @@ function StoryScreen() {
       <p className="text-center text-white/25 text-xs pb-6 mt-2">
         Every object has a story. LifeModo remembers them all.
       </p>
+      {ToastEl}
     </Screen>
   )
 }
@@ -534,9 +560,11 @@ function NotFoundScreen() {
 
 export function CircleScreen({ circle }: { circle: string }) {
   const [data, setData] = useState<HealthContext>(FALLBACK_DATA)
-  const [loading, setLoading] = useState(true)
+  // Only show loading spinner when Supabase is configured — avoids blank screen on NFC tap
+  const [loading, setLoading] = useState(hasSupabase)
 
   useEffect(() => {
+    if (!hasSupabase) return // fallback data already loaded
     fetchHealthContext().then((d) => {
       setData(d)
       setLoading(false)
