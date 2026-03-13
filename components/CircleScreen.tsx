@@ -587,12 +587,12 @@ const STREET_STYLES = [
 
 function StreetScreen() {
   const [stage, setStage] = useState<StreetStage>('photo')
+  const [mounted, setMounted] = useState(false)
   const [preview, setPreview] = useState<string | null>(null)
-  const [file, setFile] = useState<File | null>(null)
-  const [statusMsg, setStatusMsg] = useState('')
-  const [chosenLabel, setChosenLabel] = useState('')
-  const [resultUrl, setResultUrl] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
@@ -601,6 +601,10 @@ function StreetScreen() {
     setPreview(URL.createObjectURL(f))
     setStage('choice')
   }
+
+  // ... rest of the logic
+
+  if (!mounted) return null
 
   const handleChoice = async (style: typeof STREET_STYLES[0]) => {
     setStatusMsg(style.msg)
